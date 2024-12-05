@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 import cv2
 import numpy as np
 import joblib
@@ -7,9 +8,10 @@ from tensorflow.keras.preprocessing.image import img_to_array
 from tensorflow.keras.applications.vgg16 import preprocess_input
 from tensorflow.keras.applications import VGG16
 from tensorflow.keras.layers import GlobalAveragePooling2D
-import os
+import requests
+from PIL import Image
 
-# Load the Random Forest model and label encoder
+# Load the model and label encoder
 rf_model = joblib.load('models/crop_disease_model.pkl')
 label_encoder = joblib.load('models/label_encoder.pkl')
 
@@ -31,36 +33,49 @@ def preprocess_image(image_path, target_size=(128, 128)):
     features = np.expand_dims(features, axis=0)
     return features
 
-# Streamlit UI
-st.title('Crop Disease Detection')
-
-# File uploader for image input
-uploaded_file = st.file_uploader("Choose a crop image...", type=['jpg', 'jpeg', 'png'])
-
-if uploaded_file is not None:
-    # Save the uploaded file to the static/uploads directory
-    uploads_dir = os.path.join('static', 'uploads')
-    if not os.path.exists(uploads_dir):
-        os.makedirs(uploads_dir)
-
-    # Define the path to save the uploaded file
-    image_path = os.path.join(uploads_dir, uploaded_file.name)
-
-    # Save the file
-    with open(image_path, 'wb') as f:
-        f.write(uploaded_file.getbuffer())
-
-    # Display the image
-    st.image(image_path, caption='Uploaded Image', use_column_width=True)
-
-    # Preprocess the image
+# Upload and predict logic
+def predict_disease(image_file):
+    # Preprocess the image and get the features
+    image_path = f"uploads/{image_file.name}"
+    with open(image_path, "wb") as f:
+        f.write(image_file.getbuffer())
+    
     features = preprocess_image(image_path)
-
+    
     # Predict using the Random Forest model
     predicted_class = rf_model.predict(features)
-
-    # Decode the predicted class label using the label encoder
     predicted_disease = label_encoder.inverse_transform(predicted_class)
+    
+    return predicted_disease[0]
 
-    # Display the result
-    st.write(f"Predicted Disease: {predicted_disease[0]}")
+# Streamlit Interface
+st.title("Crop Disease Prediction App")
+st.write("Upload a crop image to get the disease prediction.")
+
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
+
+if uploaded_file is not None:
+    st.image(uploaded_file, caption="Uploaded Image.", use_column_width=True)
+    st.write("")
+    st.write("Classifying...")
+
+    # Make Prediction
+    disease = predict_disease(uploaded_file)
+    st.write(f"Predicted Disease: {disease}")
+
+# API Endpoint for external use
+@st.cache
+def predict_image_from_api(image_file):
+    api_url = 'http://localhost:5000/api/predict_disease'
+    files = {'file': image_file}
+    response = requests.post(api_url, files=files)
+
+    if response.status_code == 200:
+        return response.json()['predicted_disease']
+    else:
+        return "Error: Unable to predict disease."
+
+# Test API functionality
+if st.button('Test API with uploaded image'):
+    disease_from_api = predict_image_from_api(uploaded_file)
+    st.write(f"Predicted Disease via API: {disease_from_api}")
