@@ -1,7 +1,16 @@
+<<<<<<< HEAD
 Flask
 tensorflow==2.18.0
 opencv-python
 numpy
 joblib
 streamlit
+=======
+Flask
+tensorflow==2.18.0
+opencv-python
+numpy
+joblib
+streamlit
+>>>>>>> b4e531da0381eb5cedad8d8bae1984235d3578ee
 werkzeug
