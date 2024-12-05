@@ -1,0 +1,7 @@
+Flask
+tensorflow==2.18.0
+opencv-python
+numpy
+joblib
+streamlit
+werkzeug
