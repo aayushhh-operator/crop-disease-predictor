@@ -5,3 +5,14 @@ opencv-python
 joblib
 werkzeug
 gunicorn
+
+streamlit
+tensorflow==2.18.0
+opencv-python-headless
+numpy
+joblib
+requests
+Pillow
+flask
+flask-cors
+Werkzeug
