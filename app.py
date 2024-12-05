@@ -17,13 +17,13 @@ rf_model = joblib.load('models/crop_disease_model.pkl')
 label_encoder = joblib.load('models/label_encoder.pkl')
 
 # Load the pre-trained VGG16 model (without the top fully connected layers)
-base_model = VGG16(weights='imagenet', include_top=False, input_shape=(128, 128, 3))
+base_model = VGG16(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
 x = base_model.output
 x = GlobalAveragePooling2D()(x)
 model = Model(inputs=base_model.input, outputs=x)
 
 # Function to preprocess the image
-def preprocess_image(image_path, target_size=(128, 128)):
+def preprocess_image(image_path, target_size=(224, 224)):
     image = cv2.imread(image_path)
     image = cv2.resize(image, target_size)
     image = img_to_array(image)
@@ -73,36 +73,31 @@ def predict():
 # External API endpoint to accept image and return predicted disease
 @app.route('/api/predict_disease', methods=['POST'])
 def api_predict_disease():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file part'}), 400
 
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No selected file'}), 400
 
-    if file:
-        # Create the uploads directory if it doesn't exist
-        uploads_dir = os.path.join('static', 'uploads')
-        if not os.path.exists(uploads_dir):
-            os.makedirs(uploads_dir)
+        if file:
+            uploads_dir = os.path.join('static', 'uploads')
+            if not os.path.exists(uploads_dir):
+                os.makedirs(uploads_dir)
 
-        # Define the path to save the uploaded file
-        image_path = os.path.join(uploads_dir, secure_filename(file.filename))
+            image_path = os.path.join(uploads_dir, secure_filename(file.filename))
+            file.save(image_path)
 
-        # Save the file
-        file.save(image_path)
+            features = preprocess_image(image_path)
+            predicted_class = rf_model.predict(features)
+            predicted_disease = label_encoder.inverse_transform(predicted_class)
 
-        # Preprocess the image
-        features = preprocess_image(image_path)
+            os.remove(image_path)  # Clean up the uploaded file after prediction
 
-        # Predict using the Random Forest model
-        predicted_class = rf_model.predict(features)
-
-        # Decode the predicted class label using the label encoder
-        predicted_disease = label_encoder.inverse_transform(predicted_class)
-
-        # Return the predicted disease
-        return jsonify({'predicted_disease': predicted_disease[0]}), 200
+            return jsonify({'predicted_disease': predicted_disease[0]}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
